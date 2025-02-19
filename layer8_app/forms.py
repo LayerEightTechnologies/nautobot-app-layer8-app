@@ -49,16 +49,24 @@ class CommaSeparatedExpandableNameField(ExpandableNameField):
 class CableCreationForm(BootstrapMixin, forms.Form):
     """Form for creating a series of new cables between a device and a patch panel."""
 
+    building = DynamicModelChoiceField(
+        queryset=Location.objects.all(),
+        label="1. In this building: ",
+        required=False,
+        depth=0,
+        query_params={"location_type": LocationType.objects.get(name="Building").pk},
+    )
+
     device = DynamicModelChoiceField(
         queryset=Device.objects.all(),
-        label="1. On this device: ",
+        label="2. On this device: ",
         required=True,
-        query_params={"role__n": "Patch Panel"},
+        query_params={"role__n": "Patch Panel", "location": "$building"},
     )
 
     device_interface = DynamicModelMultipleChoiceField(
         queryset=Interface.objects.all(),
-        label="2. Connect these interfaces:",
+        label="3. Connect these interfaces:",
         required=True,
         query_params={
             "device_id": "$device",
@@ -74,9 +82,9 @@ class CableCreationForm(BootstrapMixin, forms.Form):
 
     patch_panel = DynamicModelChoiceField(
         queryset=Device.objects.all(),
-        label="3. To this patch panel:",
+        label="4. To this patch panel:",
         required=True,
-        query_params={"role": "Patch Panel"},  # Filter patch panels by location of the device.
+        query_params={"role": "Patch Panel", "location": "$building"},  # Filter patch panels by location of the device.
     )
 
     def __init__(self, *args, **kwargs):
@@ -93,11 +101,19 @@ class CableCreationForm(BootstrapMixin, forms.Form):
 class ExpandableCableCreationForm(BootstrapMixin, forms.Form):
     """Form for creating a series of new cables between a device and a patch panel."""
 
+    building = DynamicModelChoiceField(
+        queryset=Location.objects.all(),
+        label="1. In this building: ",
+        required=False,
+        depth=0,
+        query_params={"location_type": LocationType.objects.get(name="Building").pk},
+    )
+
     device = DynamicModelChoiceField(
         queryset=Device.objects.all(),
-        label="1. On this device: ",
+        label="2. On this device: ",
         required=True,
-        query_params={"role__n": "Patch Panel"},
+        query_params={"role__n": "Patch Panel", "location": "$building"},
     )
 
     # device_interface = DynamicModelMultipleChoiceField(
@@ -112,15 +128,15 @@ class ExpandableCableCreationForm(BootstrapMixin, forms.Form):
     # )
 
     device_interface = CommaSeparatedExpandableNameField(
-        label="2. Connect these interfaces:",
+        label="3. Connect these interfaces:",
         required=True,
     )
 
     patch_panel = DynamicModelChoiceField(
         queryset=Device.objects.all(),
-        label="3. To this patch panel:",
+        label="4. To this patch panel:",
         required=True,
-        query_params={"role": "Patch Panel"},  # Filter patch panels by location of the device.
+        query_params={"role": "Patch Panel", "location": "$building"},  # Filter patch panels by location of the device.
     )
 
     def __init__(self, *args, **kwargs):
