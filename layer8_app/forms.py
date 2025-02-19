@@ -54,7 +54,8 @@ class CableCreationForm(BootstrapMixin, forms.Form):
         label="1. In this building: ",
         required=False,
         depth=0,
-        query_params={"location_type": LocationType.objects.get(name="Building").pk},
+        # query_params={"location_type": LocationType.objects.get(name="Building").pk},
+        query_params={"location_type": "Building"},
     )
 
     device = DynamicModelChoiceField(
@@ -106,7 +107,8 @@ class ExpandableCableCreationForm(BootstrapMixin, forms.Form):
         label="1. In this building: ",
         required=False,
         depth=0,
-        query_params={"location_type": LocationType.objects.get(name="Building").pk},
+        # query_params={"location_type": LocationType.objects.get(name="Building").pk},
+        query_params={"location_type": "Building"},
     )
 
     device = DynamicModelChoiceField(
@@ -158,7 +160,8 @@ class PatchPanelCreationForm(BootstrapMixin, forms.Form):
         label="1. In all rooms this building:",
         required=True,
         depth=0,
-        query_params={"location_type": LocationType.objects.get(name="Building").pk},
+        # query_params={"location_type": LocationType.objects.get(name="Building").pk},
+        query_params={"location_type": "Building"},
     )
 
     patch_panel_type = DynamicModelChoiceField(
