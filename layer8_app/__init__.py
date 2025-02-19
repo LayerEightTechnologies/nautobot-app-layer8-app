@@ -34,6 +34,7 @@ class Layer8AppConfig(NautobotAppConfig):
         """Run when the application is ready."""
         super().ready()
         nautobot_database_ready.connect(create_default_locationtypes, sender=self)
+        nautobot_database_ready.connect(create_custom_fields, sender=self)
 
 
 config = Layer8AppConfig  # pylint:disable=invalid-name
