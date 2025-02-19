@@ -14,7 +14,7 @@ import openapi_client
 from ..helpers.get_m2m_token import get_api_token
 from ..models import AuvikTenantBuildingRelationship
 
-name = "Wavenet App SSoT Jobs"  # pylint:disable=invalid-name
+name = "Layer8 App SSoT Jobs"  # pylint:disable=invalid-name
 
 
 def tenant_api(get_api_token=get_api_token):

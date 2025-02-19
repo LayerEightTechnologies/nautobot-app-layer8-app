@@ -14,10 +14,10 @@ class Layer8AppConfig(NautobotAppConfig):
     """App configuration for the layer8_app app."""
 
     name = "layer8_app"
-    verbose_name = "Wavenet App"
+    verbose_name = "Layer8 App"
     version = __version__
     author = "Layer8 Technologies Ltd"
-    description = "Wavenet App for synchronising data between Tenant API, Auvik and Nautobot."
+    description = "Layer8 App for provisioning custom objects and providing SSOT jobs."
     base_url = "layer8-app"
     required_settings = []
     min_version = "2.0.0"
@@ -25,7 +25,8 @@ class Layer8AppConfig(NautobotAppConfig):
     default_settings = {}
     caching_config = {}
     jobs = "jobs.jobs"
-    
+
     nav_menu_items = navigation.menu_items
+
 
 config = Layer8AppConfig  # pylint:disable=invalid-name

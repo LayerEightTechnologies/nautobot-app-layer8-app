@@ -21,7 +21,7 @@ from nautobot.ipam.models import IPAddressToInterface
 from nautobot.extras.models import Status
 from django.db.models import Q
 
-name = "Wavenet App Jobs"
+name = "Layer8 App Jobs"
 
 
 class LoadBuildings(Job):

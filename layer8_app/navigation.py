@@ -2,7 +2,7 @@ from nautobot.core.apps import NavMenuAddButton, NavMenuGroup, NavMenuItem, NavM
 
 menu_items = (
     NavMenuTab(
-        name="Wavenet App",
+        name="Layer8 App",
         weight=1000,
         groups=(
             NavMenuGroup(
