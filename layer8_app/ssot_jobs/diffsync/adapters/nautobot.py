@@ -50,7 +50,9 @@ class NautobotAdapter(DiffSync):
                     # Potentially remove status from here, so it's not included in DiffSync. We always set the status for a new building to "Planned",
                     # and we don't want to update the status of existing buildings.
                     status__name=building.status.name,
-                    external_id=int(building.custom_field_data.get("external_id")) if building.custom_field_data.get("external_id") else None,
+                    external_id=int(building.custom_field_data.get("external_id"))
+                    if building.custom_field_data.get("external_id")
+                    else None,
                     longitude=building.longitude,
                     latitude=building.latitude,
                     technical_reference=(building.custom_field_data.get("technical_reference") or None),
@@ -311,6 +313,9 @@ class NautobotAuvikAdapter(DiffSync):
                     interface.add_child(child=ipaddr)
                 else:
                     # Add check to see if IP address already exists
+                    self.job.logger.info(
+                        f"IP Address not linked to mgmt0, checking if it exists in Nautobot at all: {_ipaddr.address} ."
+                    )
                     _existing_ipaddr = IPAddress.objects.get(address=_ipaddr.address)
                     if _existing_ipaddr is not None:
                         if self.job.debug:
@@ -325,6 +330,11 @@ class NautobotAuvikAdapter(DiffSync):
                                 device=None,
                             )
                             self.add(ipaddr)
+                    else:
+                        if self.job.debug:
+                            self.job.logger.info(
+                                f"IP Address: {_ipaddr.address} not found in Nautobot. Not loading IP Address."
+                            )
             except AttributeError as err:
                 if self.job.debug:
                     self.job.logger.info(
