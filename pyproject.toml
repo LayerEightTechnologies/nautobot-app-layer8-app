@@ -1,4 +1,4 @@
-[tool.poetry]
+e[tool.poetry]
 name = "layer8-app"
 version = "0.2.1"
 description = "Layer8 app for Nautobot to provision custom objects and provide SSOT jobs."
@@ -26,7 +26,7 @@ include = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.8,<3.13"
+python = ">=3.8,<3.12"
 # Used for local development
 nautobot = "^2.0.0"
 nautobot-ssot = "^2.3.0"
