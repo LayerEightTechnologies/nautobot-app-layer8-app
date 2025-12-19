@@ -11,6 +11,7 @@ def create_custom_fields(sender, apps, **kwargs):
     Interface = apps.get_model("dcim", "Interface")
     Device = apps.get_model("dcim", "Device")
     Location = apps.get_model("dcim", "Location")
+    Tenant = apps.get_model("tenancy", "Tenant")
 
     from nautobot.extras.choices import CustomFieldTypeChoices
 
@@ -58,7 +59,7 @@ def create_custom_fields(sender, apps, **kwargs):
             "label": "external_id",
             "type": CustomFieldTypeChoices.TYPE_INTEGER,
             "default": None,
-            "content_types": [ContentType.objects.get_for_model(Location)],
+            "content_types": [ContentType.objects.get_for_model(Location), ContentType.objects.get_for_model(Tenant)],
         },
         {
             "name": "Primary MAC Address",
@@ -156,3 +157,72 @@ def create_default_locationtypes(sender, apps, **kwargs):
         },
     )
     room.content_types.set(cts)
+
+
+# TODO: Populate the database with some basic DeviceTypes (+ Interfaces), Manufacturers, Platforms, CircuitTypes, Providers etc
+# def create_device_types(sender, apps, **kwargs):
+#     """Create default device types for Layer8 App."""
+#     DeviceType = apps.get_model("dcim", "DeviceType")
+#     Manufacturer = apps.get_model("dcim", "Manufacturer")
+#     Platform = apps.get_model("dcim", "Platform")
+#     DeviceBayTemplate = apps.get_model("dcim", "DeviceBayTemplate")
+#     DeviceRole = apps.get_model("dcim", "DeviceRole")
+#     RackRole = apps.get_model("dcim", "RackRole")
+#     Rack = apps.get_model("dcim", "Rack")
+#     RackGroup = apps.get_model("dcim", "RackGroup")
+#     Site = apps.get_model("dcim", "Site")
+#     ContentType = apps.get_model("contenttypes", "ContentType")
+
+#     manufacturer, _ = Manufacturer.objects.update_or_create(
+#         name="Layer8",
+#     )
+
+#     platform, _ = Platform.objects.update_or_create(
+#         name="Layer8 Platform",
+#         manufacturer=manufacturer,
+#     )
+
+#     device_role, _ = DeviceRole.objects.update_or_create(
+#         name="Layer8 Device",
+#         manufacturer=manufacturer,
+#         slug="layer8-device",
+#     )
+
+#     rack_role, _ = RackRole.objects.update_or_create(
+#         name="Layer8 Rack",
+#         slug="layer8-rack",
+#     )
+
+#     site, _ = Site.objects.update_or_create(
+#         name="Layer8 Site",
+#         slug="layer8-site",
+#     )
+
+#     rack_group, _ = RackGroup.objects.update_or_create(
+#         name="Layer8 Rack Group",
+#         slug="layer8-rack-group",
+#     )
+
+#     rack, _ = Rack.objects.update_or_create(
+#         name="Layer8 Rack",
+#         site=site,
+#         group=rack_group,
+#         role=rack_role,
+#         u_height=42,
+#     )
+
+#     device_type, _ = DeviceType.objects.update_or_create(
+#         manufacturer=manufacturer,
+#         model="Layer8 Device",
+#         slug="layer8-device",
+#         u_height=1,
+#         device_role=device_role,
+#         platform=platform,
+#         subdevice_role=ContentType.objects.get(app_label="dcim", model="device"),
+#     )
+
+#     DeviceBayTemplate.objects.update_or_create(
+#         device_type=device_type,
+#         name="Layer8 Device Bay",
+#         u_height=1,
+#     )
