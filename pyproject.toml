@@ -1,4 +1,4 @@
-e[tool.poetry]
+[tool.poetry]
 name = "layer8-app"
 version = "0.2.1"
 description = "Layer8 app for Nautobot to provision custom objects and provide SSOT jobs."
