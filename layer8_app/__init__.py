@@ -21,7 +21,14 @@ class Layer8AppConfig(NautobotAppConfig):
     author = "Layer8 Technologies Ltd"
     description = "Layer8 App for provisioning custom objects and providing SSOT jobs."
     base_url = "layer8-app"
-    required_settings = []
+    required_settings = [
+        "LAYER8_APP_M2M_CACHE_URL",
+        "LAYER8_APP_M2M_CACHE_CLIENT_ID",
+        "LAYER8_APP_M2M_CACHE_CLIENT_SECRET",
+        "LAYER8_APP_M2M_CACHE_AUDIENCE",
+        "LAYER8_APP_M2M_CACHE_TENANT_ID",
+        "LAYER8_APP_CORE_API_URL",
+    ]
     min_version = "2.0.0"
     max_version = "2.9999"
     default_settings = {}
