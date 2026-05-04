@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.4
 # -------------------------------------------------------------------------------------
 # Nautobot App Developement Dockerfile Template
 # Version: 1.1.0
@@ -28,7 +29,8 @@ ENV INVOKE_LAYER8_APP_LOCAL=true
 # Since this is only used for development and we don't ship this container, pinning Poetry back is not expressly necessary
 # We also don't need virtual environments in container
 RUN which poetry || curl -sSL https://install.python-poetry.org | python3 - && \
-    poetry config virtualenvs.create false
+    poetry config virtualenvs.create false && \
+    poetry self add poetry-plugin-export
 
 # !!! USE CAUTION WHEN MODIFYING LINES ABOVE
 # -------------------------------------------------------------------------------------
@@ -68,9 +70,29 @@ RUN poetry export -f requirements.txt --without-hashes --extras all --with dev -
 RUN sort poetry_freeze_base.txt poetry_freeze_all.txt | uniq -u > poetry_freeze_dev.txt
 
 # Install all local project as editable, constrained on Nautobot version, to get any additional
-#   direct dependencies of the app
-RUN --mount=type=cache,target="/root/.cache/pip",sharing=locked \
-    pip install -c constraints.txt -e .[all]
+#   direct dependencies of the app.
+#
+# The `github_token` BuildKit secret holds a short-lived GitHub App installation token (see
+# tasks.py::_write_github_token). It's needed because `pip install -e .[all]` transitively
+# clones private deps like layer8-core-api-py-client. Without it, the install fails with
+# a 401 on the private clone. The `if [ -s ... ]` guard makes the token optional so the
+# upstream cookiecutter template still builds for anyone with public-only deps.
+#
+# We write the gitconfig to a private HOME for this RUN (not /root) so the token never
+# lands in any persisted layer. BuildKit secrets are mount-only, but `git config --global`
+# would otherwise materialise the substituted token into /root/.gitconfig in the layer.
+RUN --mount=type=secret,id=github_token,uid=0,mode=0400 \
+    --mount=type=cache,target="/root/.cache/pip",sharing=locked <<"EOF"
+set -eu
+export HOME=/tmp/build-home
+mkdir -p "$HOME"
+if [ -s /run/secrets/github_token ]; then
+    TOKEN="$(cat /run/secrets/github_token)"
+    git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+fi
+pip install -c constraints.txt -e .[all]
+rm -rf "$HOME"
+EOF
 
 # Install any dev dependencies frozen from Poetry
 # Can be improved in Poetry 1.2 which allows `poetry install --only dev`

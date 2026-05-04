@@ -6,6 +6,8 @@ x-nautobot-build: &nautobot-build
       PYTHON_VER: "${PYTHON_VER}"
     context: "../"
     dockerfile: "development/Dockerfile"
+    secrets:
+      - "github_token"
 x-nautobot-base: &nautobot-base
   image: "layer8-app/nautobot:${NAUTOBOT_VER}-py${PYTHON_VER}"
   env_file:
@@ -50,3 +52,11 @@ services:
     healthcheck:
       disable: true
     <<: *nautobot-base
+
+secrets:
+  # Short-lived GitHub App installation token. Written by tasks.py::_write_github_token
+  # before `invoke build`. Required for the dev image build to clone private deps
+  # (e.g. layer8-core-api-py-client). The file is gitignored and removed after the
+  # build completes.
+  github_token:
+    file: "./.github_token"

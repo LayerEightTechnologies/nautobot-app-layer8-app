@@ -13,10 +13,12 @@ limitations under the License.
 """
 
 import os
+from contextlib import contextmanager
 from pathlib import Path
 from time import sleep
 
 from invoke.collection import Collection
+from invoke.exceptions import Exit
 from invoke.tasks import task as invoke_task
 
 
@@ -179,6 +181,80 @@ def run_command(context, command, **kwargs):
 # ------------------------------------------------------------------------------
 # BUILD
 # ------------------------------------------------------------------------------
+@contextmanager
+def _github_token_for_build(context):
+    """Mint a short-lived GitHub App installation token and write it to development/.github_token.
+
+    Required so the dev image build can `pip install` private deps such as
+    layer8-core-api-py-client. The file is removed when the context exits, regardless of
+    whether the build succeeded. The token never appears on stdout or in shell history.
+
+    Required env vars:
+      LAYER8_GITHUB_APP_ID            numeric GitHub App ID
+      LAYER8_GITHUB_INSTALLATION_ID   numeric Installation ID for this org
+      LAYER8_GITHUB_APP_PRIVATE_KEY   absolute path to the App's private key PEM file
+
+    If the env vars are not set, this is a no-op — the BuildKit secret will be empty and
+    the Dockerfile's `if [ -s ... ]` guard will skip the git config step. This lets the
+    upstream cookiecutter template still build for anyone with public-only deps.
+    """
+    compose_dir = Path(context.layer8_app.compose_dir)
+    token_path = compose_dir / ".github_token"
+    mint_script = compose_dir / "scripts" / "mint_github_token.py"
+    token_path.write_text("")
+    token_path.chmod(0o600)
+
+    app_id = os.environ.get("LAYER8_GITHUB_APP_ID", "").strip()
+    installation_id = os.environ.get("LAYER8_GITHUB_INSTALLATION_ID", "").strip()
+    pem_path = os.environ.get("LAYER8_GITHUB_APP_PRIVATE_KEY", "").strip()
+    have_creds = bool(app_id and installation_id and pem_path)
+
+    try:
+        if have_creds:
+            if not Path(pem_path).is_file():
+                raise Exit(
+                    f"LAYER8_GITHUB_APP_PRIVATE_KEY points at {pem_path}, which is not a "
+                    "readable file. Cannot mint GitHub token for the build."
+                )
+            # Mint the token in a one-shot python:3.11-slim container so we don't need
+            # pyjwt/cryptography on the host. PEM is bind-mounted read-only; the script
+            # writes the resulting token to /out/token (mounted at token_path).
+            print("Minting short-lived GitHub App installation token for the build...")
+            mint_cmd = (
+                "docker run --rm "
+                f'-v "{Path(pem_path).resolve()}:/run/secrets/pem:ro" '
+                f'-v "{token_path.resolve()}:/out/token" '
+                f'-v "{mint_script.resolve()}:/mint.py:ro" '
+                f"-e GITHUB_APP_ID={app_id} "
+                f"-e GITHUB_INSTALLATION_ID={installation_id} "
+                "python:3.11-slim sh -c "
+                "'pip install --quiet pyjwt cryptography requests >/dev/null && python /mint.py'"
+            )
+            result = context.run(mint_cmd, hide=True, warn=True, echo=False)
+            if not result.ok or not token_path.read_text().strip():
+                stderr_tail = (result.stderr or "").strip().splitlines()[-3:] if result else []
+                raise Exit(
+                    "Failed to mint GitHub App installation token. Check that "
+                    "LAYER8_GITHUB_APP_ID, LAYER8_GITHUB_INSTALLATION_ID, and "
+                    "LAYER8_GITHUB_APP_PRIVATE_KEY are correct, that the App is "
+                    "installed on the relevant repos, and that the PEM is unrotated.\n"
+                    + ("\n".join(stderr_tail) if stderr_tail else "")
+                )
+            print("  ...token minted (40-char ghs_ token, ~60-min expiry).")
+        else:
+            print(
+                "LAYER8_GITHUB_APP_* env vars not set; building without a GitHub token. "
+                "Private-dep installs will fail. To enable, set LAYER8_GITHUB_APP_ID, "
+                "LAYER8_GITHUB_INSTALLATION_ID, and LAYER8_GITHUB_APP_PRIVATE_KEY."
+            )
+        yield token_path
+    finally:
+        try:
+            token_path.unlink()
+        except FileNotFoundError:
+            pass
+
+
 @task(
     help={
         "force_rm": "Always remove intermediate containers",
@@ -195,7 +271,14 @@ def build(context, force_rm=False, cache=True):
         command += " --force-rm"
 
     print(f"Building Nautobot with Python {context.layer8_app.python_ver}...")
-    docker_compose(context, command)
+    with _github_token_for_build(context):
+        # DOCKER_BUILDKIT=1 + COMPOSE_DOCKER_CLI_BUILD=1 ensure compose's build subcommand
+        # uses BuildKit, which is required for `--mount=type=secret` in the Dockerfile.
+        docker_compose(
+            context,
+            command,
+            env={"DOCKER_BUILDKIT": "1", "COMPOSE_DOCKER_CLI_BUILD": "1"},
+        )
 
 
 @task
