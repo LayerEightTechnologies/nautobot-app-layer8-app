@@ -533,9 +533,9 @@ class NautobotIPAddress(IPAddress):
 
     def update(self, attrs):
         """Update IPAddress object in Nautobot."""
+        _ipaddress = OrmIPAddress.objects.get(address=self.address)
         if self.diffsync.job.debug:
             self.diffsync.job.logger.info(f"Updating IPAddress: {_ipaddress.address}")
-        _ipaddress = OrmIPAddress.objects.get(address=self.address)
         return super().update(attrs)
 
     def delete(self):

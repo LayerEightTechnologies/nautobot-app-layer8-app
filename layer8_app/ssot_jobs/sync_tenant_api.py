@@ -1,140 +1,177 @@
-"""Nautobot SSOT App jobs for the Layer 8 app."""
+"""SSOT job: sync Buildings and Rooms from the Layer8 Core API into Nautobot DCIM Locations."""
 
-from typing import Annotated
-
-from nautobot.dcim.models import Location, LocationType
+from typing import Annotated, Optional
 
 from diffsync import DiffSync
 
-import openapi_client
-from openapi_client.rest import ApiException
+from nautobot.dcim.models import Location
 
 from nautobot_ssot.contrib import NautobotModel, NautobotAdapter, CustomFieldAnnotation
 from nautobot_ssot.jobs.base import DataSource
 
-from ..helpers.get_m2m_token import get_api_token
+from layer8_core_api_py_client.api.buildings_api import BuildingsApi
+from layer8_core_api_py_client.api.rooms_api import RoomsApi
+from layer8_core_api_py_client.exceptions import ApiException
 
-
-def tenant_api(get_api_token=get_api_token):
-    """Return the authenticated API client for the Tenant API."""
-    api_token = get_api_token()
-    configuration = openapi_client.Configuration(host="https://bcs-api.wavenetuk.com/v2.5.6")
-    api_client = openapi_client.ApiClient(
-        configuration, header_name="Authorization", header_value=f"Bearer {api_token}"
-    )
-    api_instance = openapi_client.DefaultApi(api_client)
-    return api_instance
+from ..helpers.core_api import core_api_client
 
 
 name = "Layer8 App SSoT Jobs"  # pylint:disable=invalid-name
-building_location_type = LocationType.objects.get_or_create(name="Building")[0]
 
 
-# Step 1 - Data Modeling for Building
 class BuildingModel(NautobotModel):
-    """DiffSync model for Buildings."""
+    """DiffSync model for Buildings (Nautobot Locations of LocationType 'Building')."""
 
     _model = Location
     _modelname = "location"
     _identifiers = ("external_id", "location_type__name")
     _attributes = ("name", "status__name")
 
-    external_id: Annotated[int, CustomFieldAnnotation(key="external_id")]
+    # Set both `name` and `key` to work around a bug in nautobot_ssot.contrib.adapter
+    # (line ~92): the load path checks `metadata.name in database_object.cf` but does
+    # `database_object.cf[metadata.key]`. With only `key=` set, `metadata.name` is
+    # None and the custom field never gets loaded into the diffsync model.
+    external_id: Annotated[int, CustomFieldAnnotation(name="external_id", key="external_id")]
     name: str
     location_type__name: str
     status__name: str = "Planned"
 
+    @classmethod
+    def get_queryset(cls):
+        """Limit the loaded queryset to Locations of LocationType 'Building'.
 
-# Step 2.1 - Nautobot Adapter
-class MySSoTNautobotAdapter(NautobotAdapter):
-    """DiffSync adapter for Nautobot."""
+        Without this override, contrib's default `cls._model.objects.all()` returns
+        every Location (both Buildings and Rooms), which would cause RoomModel and
+        BuildingModel to double-load each other's records.
+        """
+        return Location.objects.filter(location_type__name="Building")
+
+
+class RoomModel(NautobotModel):
+    """DiffSync model for Rooms (Nautobot Locations of LocationType 'Room', nested under Buildings)."""
+
+    _model = Location
+    _modelname = "room"
+    _identifiers = ("external_id", "location_type__name")
+    _attributes = ("name", "status__name", "parent__name")
+
+    # Set both `name` and `key` to work around a bug in nautobot_ssot.contrib.adapter
+    # (line ~92): the load path checks `metadata.name in database_object.cf` but does
+    # `database_object.cf[metadata.key]`. With only `key=` set, `metadata.name` is
+    # None and the custom field never gets loaded into the diffsync model.
+    external_id: Annotated[int, CustomFieldAnnotation(name="external_id", key="external_id")]
+    name: str
+    location_type__name: str
+    parent__name: Optional[str] = None
+    status__name: str = "Planned"
+
+    @classmethod
+    def get_queryset(cls):
+        """Limit the loaded queryset to Locations of LocationType 'Room'."""
+        return Location.objects.filter(location_type__name="Room")
+
+
+class TenantApiNautobotAdapter(NautobotAdapter):
+    """DiffSync adapter for Nautobot (target)."""
 
     location = BuildingModel
-    top_level = ("location",)
+    room = RoomModel
+    top_level = ("location", "room")
 
 
-# Step 2.2 - Remote Adapter
-class MySSoTRemoteAdapter(DiffSync):
-    """DiffSync adapter for remote system."""
+class TenantApiRemoteAdapter(DiffSync):
+    """DiffSync adapter for the Layer8 Core API (source)."""
 
     location = BuildingModel
-    top_level = ("location",)
+    room = RoomModel
+    top_level = ("location", "room")
 
     def __init__(self, *args, api_client, **kwargs):
         """Initialize the adapter."""
         super().__init__(*args, **kwargs)
         self.api_client = api_client
+        # Maps Core-API building.id (int) -> building_name (str). Built during
+        # load_buildings() and consumed during load_rooms() to resolve parent
+        # links. Rooms whose building isn't in this map are skipped.
+        self._building_index = {}
+
+    def load_buildings(self):
+        """Load buildings from the Core API into DiffSync models."""
+        try:
+            buildings = BuildingsApi(self.api_client).buildings_get(limit="1000")
+        except ApiException as e:
+            raise Exception(f"Failed to fetch buildings from Layer8 Core API: {e}")
+
+        for building in buildings:
+            self._building_index[building.id] = building.building_name
+            status_name = "Active" if building.status == "Live Building" else "Planned"
+            self.add(
+                self.location(
+                    external_id=int(building.id),
+                    name=building.building_name,
+                    location_type__name="Building",
+                    status__name=status_name,
+                )
+            )
+
+    def load_rooms(self):
+        """Load rooms from the Core API into DiffSync models, skipping orphans."""
+        try:
+            rooms = RoomsApi(self.api_client).rooms_get(limit="10000")
+        except ApiException as e:
+            raise Exception(f"Failed to fetch rooms from Layer8 Core API: {e}")
+
+        for room in rooms:
+            parent_name = self._building_index.get(room.building_id)
+            if parent_name is None:
+                continue
+            status_name = "Active" if room.is_active else "Retired"
+            self.add(
+                self.room(
+                    external_id=int(room.id),
+                    name=room.room_number,
+                    location_type__name="Room",
+                    parent__name=parent_name,
+                    status__name=status_name,
+                )
+            )
 
     def load(self):
-        """Load data from the remote system."""
-        try:
-            buildings_data = self.api_client.get_buildings(page_size=1000, status="Live Building")
-            buildings_list = buildings_data["buildings"]["items"]
-            for building in buildings_list:
-                if building["status"] == "Live Building":
-                    building["status"] = "Active"
-                else:
-                    building["status"] = "Planned"
-
-                loaded_building = self.location(
-                    external_id=int(building["id"]),
-                    name=building["building_name"],
-                    location_type__name="Building",
-                    status__name=building["status"],
-                )
-                self.add(loaded_building)
-        except ApiException as e:
-            raise Exception(f"Failed to load data from remote system: {e}")
+        """Load buildings then rooms from the Core API."""
+        self.load_buildings()
+        self.load_rooms()
 
 
-# Step 3 - The Job
 class BuildingDataSource(DataSource):
-    """SSoT Job class for synchronizing building data."""
+    """SSOT job that syncs Buildings and Rooms from the Layer8 Core API into Nautobot."""
 
     class Meta:
         """Metadata for the job."""
 
-        name = "Building Data Source"
-        description = "Synchronizes building records from a remote system into Nautobot."
-
-    # # Custom fields to be handled in NautobotAdapter
-    # location_custom_fields = {
-    #     "external_id": StringVar(),
-    #     "location_type": StringVar(default="building"),
-    # }
+        name = "Layer8 Core API Data Source"
+        description = (
+            "Synchronizes building and room records from the Layer8 Core API "
+            "into Nautobot DCIM Locations."
+        )
+        has_sensitive_variables = False
 
     def load_source_adapter(self):
         """Load the source adapter."""
-        self.source_adapter = MySSoTRemoteAdapter(api_client=tenant_api())
+        self.source_adapter = TenantApiRemoteAdapter(api_client=core_api_client())
         self.source_adapter.load()
         return self.source_adapter
 
     def load_target_adapter(self):
         """Load the target adapter."""
-        self.target_adapter = MySSoTNautobotAdapter(job=self)
+        self.target_adapter = TenantApiNautobotAdapter(job=self)
         self.target_adapter.load()
         return self.target_adapter
 
-    def run(self, dryrun, memory_profiling, *args, **kwargs):
+    def run(self, dryrun=False, memory_profiling=False, *args, **kwargs):
         """Run the job."""
         self.dryrun = dryrun
         self.memory_profiling = memory_profiling
         super().run(dryrun=self.dryrun, memory_profiling=self.memory_profiling, *args, **kwargs)
-
-    # def sync_data(self, memory_profiling):
-    #     """Sync the data."""
-    #     source_adapter = self.load_source_adapter()
-    #     target_adapter = self.load_target_adapter()
-    #     diff = source_adapter.diff_from(target_adapter)
-    #     self.sync.diff = diff.dict()
-    #     self.sync.save()
-    #     self.logger.info(msg=diff.summary())
-    #     if not self.kwargs["dry_run"]:
-    #         try:
-    #             target_adapter.sync_from(source_adapter)
-    #         except ObjectNotCreated as err:
-    #             self.logger.debug(msg=f"Unable to create object. {err}")
-    #         self.logger.info(msg="Sync Completed")
 
 
 jobs = [BuildingDataSource]

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "layer8-app"
-version = "0.2.0"
+version = "0.2.2"
 description = "Layer8 app for Nautobot to provision custom objects and provide SSOT jobs."
 authors = ["Layer8 Technologies Ltd <contact@layer8.io>"]
 readme = "README.md"
@@ -32,8 +32,7 @@ nautobot = "^2.0.0"
 nautobot-ssot = "^2.3.0"
 # nautobot-secrets-providers = {git = "https://github.com/LayerEightTechnologies/nautobot-app-secrets-providers.git", rev = "implement-azure-key-vault-provider", extras = ["azure"]}
 nautobot-secrets-providers = {version = "^3.2.0", extras = ["azure"]}
-layer8-auvik-api-client = {git = "https://github.com/LayerEightTechnologies/Layer8-Auvik-PyClient-PydanticV1.git", rev = "main"}
-openapi-client = {git = "https://github.com/LayerEightTechnologies/Layer8-Core-PyClient-PydanticV1.git", rev = "main"}
+layer8-core-api-py-client = {git = "https://github.com/LayerEightTechnologies/layer8-core-api-py-client.git", rev = "main"}
 
 [tool.poetry.group.dev.dependencies]
 bandit = "*"

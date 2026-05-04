@@ -1,0 +1,1 @@
+Layer8 Core API Data Source SSOT job: contrib-style sync of Buildings and Rooms from the Layer8 Core API into Nautobot DCIM Locations. Uses the regenerated `layer8-core-api-py-client` with `x-api-key` auth; URL is built from `INSTANCE_FQDN`. Replaces the legacy hand-rolled `Layer8DataSource`.

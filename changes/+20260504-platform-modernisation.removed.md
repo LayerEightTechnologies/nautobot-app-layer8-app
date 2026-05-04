@@ -1,0 +1,1 @@
+Removed legacy Wavenet Tenant API integration: deleted `helpers/tenant_api.py`, `ssot_jobs/diffsync/adapters/layer8.py`, the hand-rolled `Layer8DataSource` and the `LoadBuildings` job. All hits on `bcs-api.wavenetuk.com` and `n8n.gateway.wavenet.co.uk` are gone.

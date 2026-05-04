@@ -1,24 +1,28 @@
-"""Serializers for the Auvik integration app."""
+"""Serializers for the Layer8 app API.
 
-from nautobot.apps.api import NautobotModelSerializer
-from ..models import AuvikTenantBuildingRelationship, AuvikTenant
+Auvik-specific serializers are commented out below; revive them when Auvik
+support returns.
+"""
 
-
-class AuvikTenantBuildingRelationshipSerializer(NautobotModelSerializer):
-    """Serializer for the AuvikTenantBuildingRelationship model."""
-
-    class Meta:
-        """Metadata for the serializer."""
-
-        model = AuvikTenantBuildingRelationship
-        fields = "__all__"
-
-
-class AuvikTenantSerializer(NautobotModelSerializer):
-    """Serializer for the AuvikTenant model."""
-
-    class Meta:
-        """Metadata for the serializer."""
-
-        model = AuvikTenant
-        fields = "__all__"
+# from nautobot.apps.api import NautobotModelSerializer
+# from ..models import AuvikTenantBuildingRelationship, AuvikTenant
+#
+#
+# class AuvikTenantBuildingRelationshipSerializer(NautobotModelSerializer):
+#     """Serializer for the AuvikTenantBuildingRelationship model."""
+#
+#     class Meta:
+#         """Metadata for the serializer."""
+#
+#         model = AuvikTenantBuildingRelationship
+#         fields = "__all__"
+#
+#
+# class AuvikTenantSerializer(NautobotModelSerializer):
+#     """Serializer for the AuvikTenant model."""
+#
+#     class Meta:
+#         """Metadata for the serializer."""
+#
+#         model = AuvikTenant
+#         fields = "__all__"

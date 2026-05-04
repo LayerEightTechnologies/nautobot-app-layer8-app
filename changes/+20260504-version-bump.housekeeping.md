@@ -1,0 +1,1 @@
+Version bump 0.2.0 → 0.2.2. Reverts a prior in-flight `required_settings` re-introduction (the new code reads `INSTANCE_FQDN` from env, not from `PLUGINS_CONFIG`). Reverts a latent `NameError` in the dormant `NautobotIPAddress.update()` debug path. Fixes a `monitoredBy`/`monitoring_fields` camelCase typo in `DecomissionDevice`.
