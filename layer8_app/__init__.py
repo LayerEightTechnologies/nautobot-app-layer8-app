@@ -7,7 +7,7 @@ from nautobot.apps import NautobotAppConfig
 from nautobot.core.signals import nautobot_database_ready
 
 from . import navigation
-from .signals import create_custom_fields, create_default_locationtypes
+from .signals import create_custom_fields, create_default_locationtypes, create_default_seed_data
 
 __version__ = metadata.version(__name__)
 
@@ -33,8 +33,12 @@ class Layer8AppConfig(NautobotAppConfig):
     def ready(self):
         """Run when the application is ready."""
         super().ready()
+        # Order matters: create_custom_fields must run before create_default_seed_data
+        # because the seed data sets values on the 'basic_type' custom field that the
+        # custom-fields handler creates.
         nautobot_database_ready.connect(create_default_locationtypes, sender=self)
         nautobot_database_ready.connect(create_custom_fields, sender=self)
+        nautobot_database_ready.connect(create_default_seed_data, sender=self)
 
 
 config = Layer8AppConfig  # pylint:disable=invalid-name
