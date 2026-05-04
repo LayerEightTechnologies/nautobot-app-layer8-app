@@ -120,6 +120,7 @@ nav:
       - Extending the App: "dev/extending.md"
       - Contributing to the App: "dev/contributing.md"
       - Development Environment: "dev/dev_environment.md"
+      - Regenerating the OpenAPI Client: "dev/regenerating_openapi_client.md"
       - Architecture Decision Records: "dev/arch_decision.md"
       - Code Reference:
           - "dev/code_reference/index.md"

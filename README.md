@@ -1,41 +1,44 @@
 # Layer8 App
 
-## Overview
+A Nautobot 2.x plugin that integrates Nautobot with the Layer8 Platform.
 
-> A Nautobot Plugin App which implements workflows for synchronising Nautobot with the Auvik network monitoring platform by providing SSOT Jobs for the `nautobot-ssot` app.
+## What it does
 
-### SSOT Jobs
+- **Bootstraps Layer8-specific seed data** on `nautobot_database_ready`:
+  - Custom fields (e.g. `external_id`, `monitoring_profile`, `cabling_model`, `circuit_role`).
+  - Default LocationTypes (`Building`, `Room`, with sensible content_types).
+  - Manufacturers, Platforms, Roles (incl. `basic_type` custom-field values), and the `Vorboss` Provider.
+- **Provides an SSOT job** (built on `nautobot-ssot`) to sync Buildings and Rooms from the **Layer8 Core API** into Nautobot DCIM Locations.
+- **Adds bespoke UI** for two manual workflows: bulk patch-panel creation per building, and bulk floodwired cable creation between a device and a patch panel.
 
-The Layer8 App includes several SSOT (Single Source of Truth) jobs that facilitate the synchronization between Nautobot and Auvik. These jobs are located in the `ssot_jobs` folder and include:
+## SSOT job
 
-- **Auvik to Nautobot Sync**: This job pulls data from Auvik and updates the corresponding records in Nautobot.
-- **Nautobot to Auvik Sync**: This job pushes data from Nautobot to Auvik, ensuring both systems are in sync.
-- **Auvik Data Validation**: This job validates the data received from Auvik to ensure it meets the required standards before updating Nautobot.
+`Layer8 Core API Data Source` (in [layer8_app/ssot_jobs/sync_tenant_api.py](layer8_app/ssot_jobs/sync_tenant_api.py)) is built on `nautobot_ssot.contrib`:
 
-These jobs help maintain data consistency and accuracy between the two platforms, making network management more efficient.
+- Source: `https://core-api.${INSTANCE_FQDN}` (auth: `x-api-key` from the `Layer8 Core API Key` Nautobot Secret).
+- Models: `BuildingModel` and `RoomModel`, both wrapping `dcim.Location` with the `external_id` custom field as the durable identifier (it stores the Core API's primary key).
+- Order matters: buildings load first to seed a `building_id → name` index that the room loader uses to resolve parent linkage. Rooms whose building isn't in the filter set are skipped.
+- Idempotent.
 
-### Additional Models
+The dormant Auvik integration (preserved on disk for future revival) has been disabled.
 
-The Layer8 App also introduces several additional models to enhance the functionality of Nautobot. These models include:
+## Configuration
 
-- **AuvikDevice**: Represents a device managed by Auvik, including attributes such as device name, IP address, and status.
-- **AuvikSite**: Represents a site or location within Auvik, including details like site name, address, and associated devices.
-- **AuvikInterface**: Represents a network interface on an Auvik-managed device, including attributes such as interface name, type, and status.
+The plugin needs:
 
-These models provide a more comprehensive representation of the network infrastructure managed by Auvik, allowing for better integration and management within Nautobot.
+- `INSTANCE_FQDN` env var on the Nautobot container — used to construct the Core API base URL.
+- A Nautobot Secret named `Layer8 Core API Key` whose value is a Layer8 Core API key.
 
-### Installation
+In production this Secret comes from Azure Key Vault via `nautobot-secrets-providers[azure]`. In local dev, the simplest path is the built-in `Environment Variable` Secret provider — see [docs/dev/dev_environment.md](docs/dev/dev_environment.md).
 
-To install the Layer8 App, follow these general steps:
+## OpenAPI client
 
-1. **Install the Plugin**: Add the Layer8 App to your Nautobot environment. This typically involves adding the plugin to your `local_requirements.txt` or `Pipfile`.
+The plugin depends on a private Python client generated from the Layer8 Core API spec (`development/layer8-core-api.openapi.json`). The client lives in its own private repo: [`LayerEightTechnologies/layer8-core-api-py-client`](https://github.com/LayerEightTechnologies/layer8-core-api-py-client).
 
-2. **Update Configuration**: Modify your `nautobot_config.py` to include the Layer8 App in the `PLUGINS` and `PLUGINS_CONFIG` settings.
+To regenerate after a spec change, use the [`/regen-core-client`](.claude/commands/regen-core-client.md) Claude Code slash command, or follow the manual steps in [docs/dev/regenerating_openapi_client.md](docs/dev/regenerating_openapi_client.md).
 
-3. **Run Migrations**: Apply the database migrations to create the necessary tables for the Layer8 App models.
+## Installation
 
-4. **Restart Nautobot**: Restart the Nautobot services to load the new plugin.
+In production, the plugin is installed by `pip install git+https://github.com/LayerEightTechnologies/nautobot-app-layer8-app.git` from the Nautobot image's Dockerfile. The build needs a GitHub App installation token (BuildKit secret) so it can transitively clone the private client. See the Layer8 monorepo's `apps/nautobot/Dockerfile` and `deploy/prod/scripts/deploy.sh`.
 
-For detailed instructions and exact steps, please refer to the [Nautobot Plugin Installation Documentation](https://nautobot.readthedocs.io/en/stable/plugins/).
-
-Following these steps will ensure that the Layer8 App is properly installed and configured within your Nautobot environment.
+For local dev: `invoke build && invoke debug`. See [docs/dev/dev_environment.md](docs/dev/dev_environment.md) for the GitHub App credential requirements.
